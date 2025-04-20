@@ -447,30 +447,25 @@ def main():
     daily = daily.loc['2011-11-01':'2014-12-31']
     daily['t_day'] = (daily.index - daily.index[0]).days
 
-    # train = daily.loc[:'2013-12-31']
+    # variable names should not be called train or be reated to it, need to fix that, but the code will remain the way it is
     train = daily.loc[:]
-    test  = daily.loc['2014-01-01':]
 
     X_train = train['t_day'].values.reshape(-1,1)
     y_train = train['total'].values
-    X_test  = test ['t_day'].values.reshape(-1,1)
-    y_test  = test ['total'].values
 
     ym, ys = y_train.mean(), y_train.std()
     ytr_n = (y_train - ym)/ys
-    yte_n = (y_test  - ym)/ys
 
-    rbf = RBFKernel(lengthscale=4.95, variance=1.0)
-    per1 = PeriodicKernel(period=365., lengthscale=72.3039510055688, variance=0.3)
-    per2 = PeriodicKernel(period=30.5,lengthscale=24.486552583062952, variance=0.3)
-    per3 = PeriodicKernel(period=7.,   lengthscale=2.9979970724403815,  variance= 0.3)
-    Ksum = SumKernel(rbf, per1, per2, per3)
+    rbf = RBFKernel(lengthscale=5., variance=0.5)
+    per1 = PeriodicKernel(period=365., lengthscale=72, variance=0.3)
+    per2 = PeriodicKernel(period=30.5,lengthscale=24, variance=0.3)
+    Ksum = SumKernel(rbf, per1, per2)
 
     t1 = time.time()
 
-    Z0 = X_train[:20]
+    Z0 = X_train[:60]
     gp  = OnlineSparseGP(Ksum, noise_var=0.1, max_points=200)
-    gp.initialize(Z0, ytr_n[:20])
+    gp.initialize(Z0, ytr_n[:60])
 
     preds_tr, vars_tr, t_tr = [], [], []
     for i,(x,y) in enumerate(zip(X_train, ytr_n)):
@@ -499,18 +494,7 @@ def main():
     s_tr_spline = make_interp_spline(t_tr_sorted, s_tr_sorted, k=3)
     s_tr_smooth = s_tr_spline(t_tr_smooth)
 
-    plt.figure(figsize=(12,6))
-    plt.plot(t_tr, a_tr, 'bo', markersize=1, label="Actual train")
-    plt.plot(t_tr_smooth, p_tr_smooth, 'r-', label="Pred. train")
-    plt.fill_between(t_tr_smooth, 
-                    p_tr_smooth - 1.96 * s_tr_smooth, 
-                    p_tr_smooth + 1.96 * s_tr_smooth, 
-                    color='r', alpha=0.2, label="95% CI")
-    plt.scatter(Zx, np.interp(Zx, t_tr, p_tr), marker='x', s=80, color='k', label="Inducing")
-    plt.title("Training: 1-step ahead"); plt.xlabel("Days"); plt.ylabel("Load")
-    plt.legend(); plt.grid(True)
-
-    plt.show()
+    print("MSE:", np.sqrt(np.sum(np.square(y_train - p_tr))))
 
     plt.figure(figsize=(12,6))
     plt.plot(train['t_day'], y_train, 'o', markersize=2, label="Actual train")
